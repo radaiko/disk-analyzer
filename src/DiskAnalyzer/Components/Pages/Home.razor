@@ -1,0 +1,271 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject FolderDataService DataService
+@inject FolderScannerService ScannerService
+@inject ILogger<Home> Logger
+
+<PageTitle>Dashboard - Disk Analyzer</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="scan-status">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        @if (latestScan != null)
+                        {
+                            <h5>Last Scan: @latestScan.StartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</h5>
+                            <p class="mb-0">
+                                Status: <span class="badge bg-@GetStatusBadgeColor(latestScan.Status)">@latestScan.Status</span>
+                                | Folders: @latestScan.FoldersScanned
+                                | Files: @latestScan.FilesScanned
+                                | Size: @FormatBytes(latestScan.TotalBytes)
+                            </p>
+                        }
+                        else
+                        {
+                            <h5>No scans available</h5>
+                            <p class="mb-0">Click "Start Scan" to begin analyzing disk usage</p>
+                        }
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" @onclick="StartScan" disabled="@ScannerService.IsScanning">
+                            @if (ScannerService.IsScanning)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Scanning...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-sync-alt me-2"></i>
+                                <span>Start Scan</span>
+                            }
+                        </button>
+                        @if (ScannerService.IsScanning)
+                        {
+                            <button class="btn btn-danger ms-2" @onclick="CancelScan">
+                                <i class="fas fa-times me-2"></i> Cancel
+                            </button>
+                        }
+                    </div>
+                </div>
+                @if (scanProgress != null && ScannerService.IsScanning)
+                {
+                    <div class="mt-3">
+                        <p class="mb-1">@scanProgress.CurrentPath</p>
+                        <p class="mb-0 text-muted">
+                            Folders: @scanProgress.FoldersScanned | Files: @scanProgress.FilesScanned | @FormatBytes(scanProgress.TotalBytes)
+                        </p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (selectedFolder != null)
+    {
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h4>@selectedFolder.Name</h4>
+                    <p class="text-muted">@selectedFolder.Path</p>
+                    <p>Size: @FormatBytes(selectedFolder.SizeBytes) | Files: @selectedFolder.FileCount</p>
+                    
+                    @if (chartData.Any())
+                    {
+                        <ApexChart TItem="ChartDataPoint" Options="chartOptions">
+                            <ApexPointSeries TItem="ChartDataPoint"
+                                Items="chartData"
+                                SeriesType="SeriesType.Pie"
+                                XValue="@(e => e.Name)"
+                                YValue="@(e => (decimal)e.Value)"
+                                OrderByDescending="e => e.Y" />
+                        </ApexChart>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No subfolders to display</p>
+                    }
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="tree-container">
+                    <h4>Folder Tree</h4>
+                    @if (rootFolder != null)
+                    {
+                        <FolderTreeNode Folder="rootFolder" SelectedFolderId="selectedFolder.Id" OnFolderSelected="SelectFolder" />
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else if (rootFolder == null && !ScannerService.IsScanning)
+    {
+        <div class="alert alert-info">
+            <h4>Welcome to Disk Analyzer</h4>
+            <p>No scan data available. Click "Start Scan" to analyze your disk usage.</p>
+        </div>
+    }
+</div>
+
+@code {
+    private FolderNode? rootFolder;
+    private FolderNode? selectedFolder;
+    private ScanResult? latestScan;
+    private ScanProgressEventArgs? scanProgress;
+    private List<ChartDataPoint> chartData = new();
+    private ApexChartOptions<ChartDataPoint> chartOptions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        InitializeChartOptions();
+        ScannerService.ProgressUpdated += OnScanProgress;
+        ScannerService.ScanCompleted += OnScanCompleted;
+        await LoadDataAsync();
+    }
+
+    private void InitializeChartOptions()
+    {
+        chartOptions = new ApexChartOptions<ChartDataPoint>
+        {
+            Theme = new ApexCharts.Theme { Mode = Mode.Dark },
+            Legend = new Legend { Position = LegendPosition.Bottom },
+            Chart = new Chart { Background = "transparent" }
+        };
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            latestScan = await DataService.GetLatestScanAsync();
+            rootFolder = await DataService.GetRootFolderAsync();
+            
+            if (rootFolder != null)
+            {
+                selectedFolder = rootFolder;
+                await UpdateChartDataAsync();
+            }
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading data");
+        }
+    }
+
+    private async Task SelectFolder(int folderId)
+    {
+        try
+        {
+            var folder = await DataService.GetFolderByIdAsync(folderId);
+            if (folder != null)
+            {
+                selectedFolder = folder;
+                await UpdateChartDataAsync();
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error selecting folder");
+        }
+    }
+
+    private async Task UpdateChartDataAsync()
+    {
+        if (selectedFolder == null) return;
+
+        try
+        {
+            var children = await DataService.GetChildrenAsync(selectedFolder.Id);
+            chartData = children.Select(f => new ChartDataPoint
+            {
+                Name = f.Name,
+                Value = f.SizeBytes
+            }).ToList();
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating chart data");
+        }
+    }
+
+    private async Task StartScan()
+    {
+        try
+        {
+            var settings = await DataService.GetSettingsAsync();
+            var scanPath = settings?.ScanRootPath ?? "/mnt";
+            
+            // Start scan in background
+            _ = Task.Run(async () =>
+            {
+                await ScannerService.StartScanAsync(scanPath);
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error starting scan");
+        }
+    }
+
+    private void CancelScan()
+    {
+        ScannerService.CancelScan();
+    }
+
+    private void OnScanProgress(object? sender, ScanProgressEventArgs e)
+    {
+        scanProgress = e;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async void OnScanCompleted(object? sender, ScanResult e)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadDataAsync();
+        });
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private string GetStatusBadgeColor(ScanStatus status)
+    {
+        return status switch
+        {
+            ScanStatus.Completed => "success",
+            ScanStatus.Running => "primary",
+            ScanStatus.Failed => "danger",
+            ScanStatus.Cancelled => "warning",
+            _ => "secondary"
+        };
+    }
+
+    public void Dispose()
+    {
+        ScannerService.ProgressUpdated -= OnScanProgress;
+        ScannerService.ScanCompleted -= OnScanCompleted;
+    }
+
+    public class ChartDataPoint
+    {
+        public string Name { get; set; } = string.Empty;
+        public long Value { get; set; }
+    }
+}
