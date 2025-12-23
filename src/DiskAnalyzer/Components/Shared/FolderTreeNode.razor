@@ -1,0 +1,97 @@
+@inject FolderDataService DataService
+
+<div class="tree-node @(Folder.Id == SelectedFolderId ? "selected" : "")" @onclick="() => OnClick()">
+    @if (hasChildren)
+    {
+        <i class="fas fa-@(isExpanded ? "chevron-down" : "chevron-right") me-2" @onclick:stopPropagation="true" @onclick="ToggleExpanded"></i>
+    }
+    else
+    {
+        <i class="fas fa-folder me-2"></i>
+    }
+    <span>@Folder.Name</span>
+    <span class="size-badge">@FormatBytes(Folder.SizeBytes)</span>
+</div>
+
+@if (isExpanded && hasChildren)
+{
+    <div class="tree-node-children">
+        @foreach (var child in children)
+        {
+            <FolderTreeNode Folder="child" SelectedFolderId="SelectedFolderId" OnFolderSelected="OnFolderSelected" />
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public FolderNode Folder { get; set; } = null!;
+
+    [Parameter]
+    public int SelectedFolderId { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnFolderSelected { get; set; }
+
+    private bool isExpanded = false;
+    private bool hasChildren = false;
+    private List<FolderNode> children = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadChildren();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Auto-expand if this folder is selected
+        if (Folder.Id == SelectedFolderId && !isExpanded)
+        {
+            isExpanded = true;
+            await LoadChildren();
+        }
+    }
+
+    private async Task LoadChildren()
+    {
+        if (hasChildren || children.Any()) return;
+
+        try
+        {
+            children = await DataService.GetChildrenAsync(Folder.Id);
+            hasChildren = children.Any();
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            // Ignore errors loading children
+        }
+    }
+
+    private async Task ToggleExpanded()
+    {
+        isExpanded = !isExpanded;
+        if (isExpanded && !children.Any())
+        {
+            await LoadChildren();
+        }
+    }
+
+    private async Task OnClick()
+    {
+        await OnFolderSelected.InvokeAsync(Folder.Id);
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

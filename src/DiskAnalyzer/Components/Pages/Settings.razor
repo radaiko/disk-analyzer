@@ -1,0 +1,151 @@
+@page "/settings"
+@rendermode InteractiveServer
+@inject FolderDataService DataService
+@inject ILogger<Settings> Logger
+
+<PageTitle>Settings - Disk Analyzer</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Scan Settings</h4>
+                </div>
+                <div class="card-body">
+                    @if (settings != null)
+                    {
+                        <EditForm Model="settings" OnValidSubmit="SaveSettings">
+                            <div class="mb-3">
+                                <label class="form-label">Scan Root Path</label>
+                                <InputText class="form-control" @bind-Value="settings.ScanRootPath" />
+                                <div class="form-text">The root directory to scan (default: /mnt)</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Scan Interval (hours)</label>
+                                <InputNumber class="form-control" @bind-Value="settings.ScanIntervalHours" />
+                                <div class="form-text">How often to automatically scan (in hours)</div>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <InputCheckbox class="form-check-input" @bind-Value="settings.AutoScanEnabled" id="autoScanCheck" />
+                                <label class="form-check-label" for="autoScanCheck">
+                                    Enable Automatic Scanning
+                                </label>
+                            </div>
+
+                            @if (settings.LastScanTime != null)
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label">Last Scan</label>
+                                    <input type="text" class="form-control" value="@settings.LastScanTime.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")" readonly />
+                                </div>
+                            }
+
+                            @if (settings.NextScanTime != null && settings.AutoScanEnabled)
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label">Next Scheduled Scan</label>
+                                    <input type="text" class="form-control" value="@settings.NextScanTime.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")" readonly />
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrEmpty(message))
+                            {
+                                <div class="alert alert-@(isError ? "danger" : "success")" role="alert">
+                                    @message
+                                </div>
+                            }
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                                    @if (isSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        <span>Saving...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-save me-2"></i>
+                                        <span>Save Settings</span>
+                                    }
+                                </button>
+                            </div>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private AppSettings? settings;
+    private bool isSaving = false;
+    private string message = string.Empty;
+    private bool isError = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSettings();
+    }
+
+    private async Task LoadSettings()
+    {
+        try
+        {
+            settings = await DataService.GetSettingsAsync();
+            if (settings == null)
+            {
+                // Initialize default settings if none exist
+                settings = new AppSettings
+                {
+                    ScanIntervalHours = 24,
+                    AutoScanEnabled = true,
+                    ScanRootPath = "/mnt"
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading settings");
+            message = "Error loading settings";
+            isError = true;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        if (settings == null) return;
+
+        isSaving = true;
+        message = string.Empty;
+
+        try
+        {
+            await DataService.UpdateSettingsAsync(settings);
+            message = "Settings saved successfully";
+            isError = false;
+            Logger.LogInformation("Settings updated");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving settings");
+            message = "Error saving settings: " + ex.Message;
+            isError = true;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

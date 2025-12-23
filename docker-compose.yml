@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  disk-analyzer:
+    build: .
+    container_name: disk-analyzer
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount your data directories here
+      # Example: Mount host directories to /mnt inside the container
+      - /path/to/your/data:/mnt/data:ro
+      - /path/to/your/media:/mnt/media:ro
+      # Persistent config and database
+      - ./config:/app/config
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    restart: unless-stopped
+    networks:
+      - disk-analyzer-network
+
+networks:
+  disk-analyzer-network:
+    driver: bridge
