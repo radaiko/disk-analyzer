@@ -1,5 +1,7 @@
 # Disk Space Analyzer
 
+![Docker Build](https://github.com/radaiko/disk-analyzer/actions/workflows/docker-build-push.yml/badge.svg)
+
 A self-hosted disk space analyzer that runs as a Docker container and provides a modern dark-themed web interface for visualizing disk usage across mounted directories.
 
 ## Features
@@ -23,7 +25,40 @@ A self-hosted disk space analyzer that runs as a Docker container and provides a
 
 ## Quick Start
 
-### Using Docker Compose (Recommended)
+### Using Pre-built Docker Image (Easiest)
+
+Pull and run the latest pre-built image from GitHub Container Registry:
+
+```bash
+docker run -d \
+  --name disk-analyzer \
+  -p 8080:8080 \
+  -v /your/data:/mnt/data:ro \
+  -v /your/media:/mnt/media:ro \
+  -v ./config:/app/config \
+  ghcr.io/radaiko/disk-analyzer:latest
+```
+
+Or use Docker Compose with the pre-built image:
+
+```yaml
+version: "3.9"
+services:
+  disk-analyzer:
+    image: ghcr.io/radaiko/disk-analyzer:latest
+    container_name: disk-analyzer
+    ports:
+      - "8080:8080"
+    volumes:
+      - /your/data:/mnt/data:ro
+      - /your/media:/mnt/media:ro
+      - ./config:/app/config
+    restart: unless-stopped
+```
+
+Then open your browser to `http://localhost:8080`
+
+### Using Docker Compose (Build from Source)
 
 1. Clone the repository:
    ```bash
@@ -46,7 +81,7 @@ A self-hosted disk space analyzer that runs as a Docker container and provides a
 
 4. Open your browser to `http://localhost:8080`
 
-### Using Docker
+### Using Docker (Build from Source)
 
 ```bash
 docker build -t disk-analyzer .
@@ -111,7 +146,7 @@ Configure the analyzer through the Settings page:
 version: "3.9"
 services:
   disk-analyzer:
-    image: disk-analyzer
+    image: ghcr.io/radaiko/disk-analyzer:latest
     container_name: disk-analyzer
     ports:
       - "8080:8080"
@@ -128,7 +163,7 @@ services:
 version: "3.9"
 services:
   disk-analyzer:
-    image: disk-analyzer
+    image: ghcr.io/radaiko/disk-analyzer:latest
     container_name: disk-analyzer
     ports:
       - "8080:8080"
