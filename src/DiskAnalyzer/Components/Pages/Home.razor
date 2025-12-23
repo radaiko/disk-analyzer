@@ -64,12 +64,12 @@
 
     @if (selectedFolder != null)
     {
-        <div class="row">
-            <div class="col-md-6">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-6 col-xl-5 mb-3">
                 <div class="chart-container">
                     <h4>@selectedFolder.Name</h4>
-                    <p class="text-muted">@selectedFolder.Path</p>
-                    <p>Size: @FormatBytes(selectedFolder.SizeBytes) | Files: @selectedFolder.FileCount</p>
+                    <p class="text-muted mb-2">@selectedFolder.Path</p>
+                    <p class="mb-3"><strong>Size:</strong> @FormatBytes(selectedFolder.SizeBytes) | <strong>Files:</strong> @selectedFolder.FileCount</p>
                     
                     @if (chartData.Any())
                     {
@@ -88,9 +88,9 @@
                     }
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-lg-6 col-xl-5 mb-3">
                 <div class="tree-container">
-                    <h4>Folder Tree</h4>
+                    <h4 class="mb-3">Folder Tree</h4>
                     @if (rootFolder != null)
                     {
                         <FolderTreeNode Folder="rootFolder" SelectedFolderId="selectedFolder.Id" OnFolderSelected="SelectFolder" />
