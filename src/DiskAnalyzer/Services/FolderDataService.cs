@@ -161,4 +161,32 @@ public class FolderDataService
         context.AppSettings.Update(settings);
         await context.SaveChangesAsync();
     }
+    
+    public async Task<bool> DeleteScanAsync(int scanId)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+        var scan = await context.ScanResults.FirstOrDefaultAsync(s => s.Id == scanId);
+        
+        if (scan == null)
+        {
+            return false;
+        }
+        
+        // Explicitly delete folder nodes to ensure cleanup
+        var folderNodes = await context.FolderNodes
+            .Where(f => f.ScanResultId == scanId)
+            .ToListAsync();
+        
+        if (folderNodes.Any())
+        {
+            context.FolderNodes.RemoveRange(folderNodes);
+        }
+        
+        // Delete the scan
+        context.ScanResults.Remove(scan);
+        await context.SaveChangesAsync();
+        
+        _logger.LogInformation("Deleted scan {ScanId} and {FolderCount} folder nodes", scanId, folderNodes.Count);
+        return true;
+    }
 }
