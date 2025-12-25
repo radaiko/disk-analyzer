@@ -1,16 +1,12 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="app-container">
+    <div class="app-sidebar">
         <NavMenu />
     </div>
 
-    <main>
-        <div class="top-row px-4">
-            <h4 class="text-light">Disk Space Analyzer</h4>
-        </div>
-
-        <article class="content px-4">
+    <main class="app-main">
+        <article class="app-content">
             @Body
         </article>
     </main>
