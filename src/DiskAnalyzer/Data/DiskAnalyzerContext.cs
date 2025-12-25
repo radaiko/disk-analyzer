@@ -21,12 +21,18 @@ public class DiskAnalyzerContext : DbContext
         modelBuilder.Entity<FolderNode>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Path).IsUnique();
+            entity.HasIndex(e => new { e.Path, e.ScanResultId }).IsUnique();
             entity.HasIndex(e => e.ParentId);
+            entity.HasIndex(e => e.ScanResultId);
             
             entity.HasOne(e => e.Parent)
                 .WithMany(e => e.Children)
                 .HasForeignKey(e => e.ParentId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.ScanResult)
+                .WithMany()
+                .HasForeignKey(e => e.ScanResultId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

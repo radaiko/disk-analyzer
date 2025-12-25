@@ -46,11 +46,7 @@ public class FolderScannerService
             context.ScanResults.Add(scanResult);
             await context.SaveChangesAsync();
 
-            // Clear previous scan data
-            await context.Database.ExecuteSqlRawAsync("DELETE FROM FolderNodes");
-            await context.SaveChangesAsync();
-
-            // Start scanning
+            // Start scanning (no longer deleting previous folder nodes)
             await ScanDirectoryRecursiveAsync(rootPath, null, scanResult, context, _cancellationTokenSource.Token);
 
             scanResult.EndTime = DateTime.UtcNow;
@@ -114,7 +110,8 @@ public class FolderScannerService
             Path = path,
             Name = Path.GetFileName(path) == "" ? path : Path.GetFileName(path),
             ParentId = parentId,
-            LastScanned = DateTime.UtcNow
+            LastScanned = DateTime.UtcNow,
+            ScanResultId = scanResult.Id
         };
 
         long totalSize = 0;

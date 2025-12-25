@@ -185,3 +185,19 @@ h1:focus {
 .nav-link:hover {
     color: var(--accent-color) !important;
 }
+
+.scan-selector {
+    padding: 1rem;
+    background-color: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.scan-selector .form-label {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.scan-selector .form-select {
+    max-width: 500px;
+}
