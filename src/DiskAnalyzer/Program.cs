@@ -92,6 +92,7 @@ using (var scope = app.Services.CreateScope())
                     .FirstOrDefaultAsync();
                 
                 // Add the column with a default value
+                // Note: firstScanId is an integer from the database, not user input - safe from SQL injection
                 await context.Database.ExecuteSqlRawAsync(
                     "ALTER TABLE FolderNodes ADD COLUMN ScanResultId INTEGER NOT NULL DEFAULT " + firstScanId.ToString());
                     
