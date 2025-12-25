@@ -9,17 +9,11 @@ public class FolderNode
     public int FileCount { get; set; }
     public int? ParentId { get; set; }
     public DateTime LastScanned { get; set; }
-<<<<<<< HEAD
     public int ScanResultId { get; set; }
     
     public FolderNode? Parent { get; set; }
     public List<FolderNode> Children { get; set; } = new();
     public ScanResult? ScanResult { get; set; }
-=======
-    
-    public FolderNode? Parent { get; set; }
-    public List<FolderNode> Children { get; set; } = new();
->>>>>>> dev
     
     public double SizeGB => SizeBytes / (1024.0 * 1024.0 * 1024.0);
     
