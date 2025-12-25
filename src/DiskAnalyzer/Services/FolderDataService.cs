@@ -17,12 +17,29 @@ public class FolderDataService
         _logger = logger;
     }
 
-    public async Task<FolderNode?> GetRootFolderAsync()
+    public async Task<FolderNode?> GetRootFolderAsync(int? scanResultId = null)
     {
         using var context = await _contextFactory.CreateDbContextAsync();
+        
+        if (scanResultId.HasValue)
+        {
+            return await context.FolderNodes
+                .Include(f => f.Children)
+                .FirstOrDefaultAsync(f => f.ParentId == null && f.ScanResultId == scanResultId.Value);
+        }
+        
+        // Get root folder from the latest completed scan
+        var latestScan = await context.ScanResults
+            .Where(s => s.Status == ScanStatus.Completed)
+            .OrderByDescending(s => s.StartTime)
+            .FirstOrDefaultAsync();
+            
+        if (latestScan == null)
+            return null;
+            
         return await context.FolderNodes
             .Include(f => f.Children)
-            .FirstOrDefaultAsync(f => f.ParentId == null);
+            .FirstOrDefaultAsync(f => f.ParentId == null && f.ScanResultId == latestScan.Id);
     }
 
     public async Task<FolderNode?> GetFolderByIdAsync(int id)
@@ -34,13 +51,31 @@ public class FolderDataService
             .FirstOrDefaultAsync(f => f.Id == id);
     }
 
-    public async Task<FolderNode?> GetFolderByPathAsync(string path)
+    public async Task<FolderNode?> GetFolderByPathAsync(string path, int? scanResultId = null)
     {
         using var context = await _contextFactory.CreateDbContextAsync();
+        
+        if (scanResultId.HasValue)
+        {
+            return await context.FolderNodes
+                .Include(f => f.Parent)
+                .Include(f => f.Children)
+                .FirstOrDefaultAsync(f => f.Path == path && f.ScanResultId == scanResultId.Value);
+        }
+        
+        // Get from the latest completed scan
+        var latestScan = await context.ScanResults
+            .Where(s => s.Status == ScanStatus.Completed)
+            .OrderByDescending(s => s.StartTime)
+            .FirstOrDefaultAsync();
+            
+        if (latestScan == null)
+            return null;
+            
         return await context.FolderNodes
             .Include(f => f.Parent)
             .Include(f => f.Children)
-            .FirstOrDefaultAsync(f => f.Path == path);
+            .FirstOrDefaultAsync(f => f.Path == path && f.ScanResultId == latestScan.Id);
     }
 
     public async Task<List<FolderNode>> GetChildrenAsync(int parentId)
@@ -52,11 +87,31 @@ public class FolderDataService
             .ToListAsync();
     }
 
-    public async Task<List<FolderNode>> GetFolderTreeAsync(int? parentId = null)
+    public async Task<List<FolderNode>> GetFolderTreeAsync(int? parentId = null, int? scanResultId = null)
     {
         using var context = await _contextFactory.CreateDbContextAsync();
-        return await context.FolderNodes
-            .Where(f => f.ParentId == parentId)
+        
+        var query = context.FolderNodes.Where(f => f.ParentId == parentId);
+        
+        if (scanResultId.HasValue)
+        {
+            query = query.Where(f => f.ScanResultId == scanResultId.Value);
+        }
+        else
+        {
+            // Get from the latest completed scan
+            var latestScan = await context.ScanResults
+                .Where(s => s.Status == ScanStatus.Completed)
+                .OrderByDescending(s => s.StartTime)
+                .FirstOrDefaultAsync();
+                
+            if (latestScan != null)
+            {
+                query = query.Where(f => f.ScanResultId == latestScan.Id);
+            }
+        }
+        
+        return await query
             .Include(f => f.Children)
             .OrderByDescending(f => f.SizeBytes)
             .ToListAsync();
@@ -77,6 +132,21 @@ public class FolderDataService
         return await context.ScanResults
             .OrderByDescending(s => s.StartTime)
             .FirstOrDefaultAsync();
+    }
+    
+    public async Task<ScanResult?> GetLatestCompletedScanAsync()
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.ScanResults
+            .Where(s => s.Status == ScanStatus.Completed)
+            .OrderByDescending(s => s.StartTime)
+            .FirstOrDefaultAsync();
+    }
+    
+    public async Task<ScanResult?> GetScanByIdAsync(int id)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.ScanResults.FirstOrDefaultAsync(s => s.Id == id);
     }
 
     public async Task<AppSettings?> GetSettingsAsync()

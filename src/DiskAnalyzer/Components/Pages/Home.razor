@@ -62,6 +62,24 @@
         </div>
     </div>
 
+    @if (availableScans.Any())
+    {
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="scan-selector">
+                    <label for="scanSelect" class="form-label">View Scan:</label>
+                    <select id="scanSelect" class="form-select" @onchange="OnScanSelected" value="@selectedScanId">
+                        @foreach (var scan in availableScans)
+                        {
+                            var scanLabel = GetScanLabel(scan);
+                            <option value="@scan.Id">@scanLabel</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+    }
+
     @if (selectedFolder != null)
     {
         <div class="row">
@@ -115,6 +133,8 @@
     private ScanProgressEventArgs? scanProgress;
     private List<ChartDataPoint> chartData = new();
     private ApexChartOptions<ChartDataPoint> chartOptions = new();
+    private List<ScanResult> availableScans = new();
+    private int? selectedScanId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -139,12 +159,25 @@
         try
         {
             latestScan = await DataService.GetLatestScanAsync();
-            rootFolder = await DataService.GetRootFolderAsync();
+            availableScans = await DataService.GetRecentScansAsync(20);
             
-            if (rootFolder != null)
+            // If a scan is running, show the last completed scan
+            if (ScannerService.IsScanning)
             {
-                selectedFolder = rootFolder;
-                await UpdateChartDataAsync();
+                var latestCompleted = await DataService.GetLatestCompletedScanAsync();
+                if (latestCompleted != null)
+                {
+                    selectedScanId = latestCompleted.Id;
+                }
+            }
+            else if (latestScan != null && latestScan.Status == ScanStatus.Completed)
+            {
+                selectedScanId = latestScan.Id;
+            }
+            
+            if (selectedScanId.HasValue)
+            {
+                await LoadScanDataAsync(selectedScanId.Value);
             }
             
             StateHasChanged();
@@ -152,6 +185,34 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading data");
+        }
+    }
+    
+    private async Task LoadScanDataAsync(int scanId)
+    {
+        try
+        {
+            rootFolder = await DataService.GetRootFolderAsync(scanId);
+            
+            if (rootFolder != null)
+            {
+                selectedFolder = rootFolder;
+                await UpdateChartDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading scan data");
+        }
+    }
+    
+    private async Task OnScanSelected(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var scanId))
+        {
+            selectedScanId = scanId;
+            await LoadScanDataAsync(scanId);
+            StateHasChanged();
         }
     }
 
@@ -230,6 +291,20 @@
         {
             await LoadDataAsync();
         });
+    }
+    
+    private string GetScanLabel(ScanResult scan)
+    {
+        var dateStr = scan.StartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        var statusStr = scan.Status.ToString();
+        var sizeStr = FormatBytes(scan.TotalBytes);
+        
+        if (scan.Status == ScanStatus.Running)
+        {
+            return $"{dateStr} - {statusStr} (Current)";
+        }
+        
+        return $"{dateStr} - {statusStr} - {sizeStr}";
     }
 
     private string FormatBytes(long bytes)
