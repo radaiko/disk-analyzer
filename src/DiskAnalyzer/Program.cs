@@ -116,6 +116,22 @@ using (var scope = app.Services.CreateScope())
         // If migration fails, try to create from scratch
         await context.Database.EnsureCreatedAsync();
     }
+    
+    // Mark any Running or Pending scans as Cancelled (they were interrupted by app restart)
+    var staleScans = await context.ScanResults
+        .Where(s => s.Status == DiskAnalyzer.Models.ScanStatus.Running || 
+                    s.Status == DiskAnalyzer.Models.ScanStatus.Pending)
+        .ToListAsync();
+    
+    if (staleScans.Any())
+    {
+        foreach (var scan in staleScans)
+        {
+            scan.Status = DiskAnalyzer.Models.ScanStatus.Cancelled;
+            scan.EndTime ??= DateTime.UtcNow;
+        }
+        await context.SaveChangesAsync();
+    }
 }
 
 app.Run();

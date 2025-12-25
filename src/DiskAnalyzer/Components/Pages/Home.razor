@@ -24,6 +24,7 @@
                             <h5>Last Scan: @latestScan.StartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</h5>
                             <p class="mb-0">
                                 Status: <span class="badge bg-@GetStatusBadgeColor(latestScan.Status)">@latestScan.Status</span>
+                                | Duration: @FormatDuration(latestScan)
                                 | Folders: @latestScan.FoldersScanned
                                 | Files: @latestScan.FilesScanned
                                 | Size: @FormatBytes(latestScan.TotalBytes)
@@ -75,13 +76,22 @@
             <div class="col-12">
                 <div class="scan-selector">
                     <label for="scanSelect" class="form-label">View Scan:</label>
-                    <select id="scanSelect" class="form-select" @onchange="OnScanSelected" value="@selectedScanId">
-                        @foreach (var scan in availableScans)
+                    <div class="d-flex gap-2 align-items-center">
+                        <select id="scanSelect" class="form-select" @onchange="OnScanSelected" value="@selectedScanId">
+                            @foreach (var scan in availableScans)
+                            {
+                                var scanLabel = GetScanLabel(scan);
+                                <option value="@scan.Id">@scanLabel</option>
+                            }
+                        </select>
+                        @if (selectedScanId.HasValue && availableScans.Count > 1)
                         {
-                            var scanLabel = GetScanLabel(scan);
-                            <option value="@scan.Id">@scanLabel</option>
+                            <button class="btn btn-danger" @onclick="() => DeleteScan(selectedScanId.Value)" 
+                                    title="Delete this scan">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
                         }
-                    </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -305,13 +315,73 @@
         var dateStr = scan.StartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
         var statusStr = scan.Status.ToString();
         var sizeStr = FormatBytes(scan.TotalBytes);
+        var durationStr = FormatDuration(scan);
         
         if (scan.Status == ScanStatus.Running)
         {
             return $"{dateStr} - {statusStr} (Current)";
         }
         
-        return $"{dateStr} - {statusStr} - {sizeStr}";
+        return $"{dateStr} - {statusStr} - {durationStr} - {sizeStr}";
+    }
+    
+    private string FormatDuration(ScanResult scan)
+    {
+        TimeSpan duration;
+        
+        if (scan.EndTime.HasValue)
+        {
+            // Completed, failed, or cancelled scan
+            duration = scan.EndTime.Value - scan.StartTime;
+        }
+        else if (scan.Status == ScanStatus.Running)
+        {
+            // Currently running scan - show elapsed time
+            duration = DateTime.UtcNow - scan.StartTime;
+        }
+        else
+        {
+            // No end time and not running (shouldn't happen, but handle it)
+            return "N/A";
+        }
+        
+        if (duration.TotalSeconds < 60)
+        {
+            return $"{duration.TotalSeconds:F0}s";
+        }
+        else if (duration.TotalMinutes < 60)
+        {
+            return $"{duration.TotalMinutes:F1}m";
+        }
+        else
+        {
+            return $"{duration.TotalHours:F1}h";
+        }
+    }
+
+    private async Task DeleteScan(int scanId)
+    {
+        try
+        {
+            var success = await DataService.DeleteScanAsync(scanId);
+            
+            if (success)
+            {
+                Logger.LogInformation("Deleted scan {ScanId}", scanId);
+                
+                // Reload data after deletion
+                await LoadDataAsync();
+                StateHasChanged();
+            }
+            else
+            {
+                Logger.LogWarning("Failed to delete scan {ScanId}", scanId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting scan");
+        }
     }
 
     private string FormatBytes(long bytes)
