@@ -172,8 +172,7 @@ public class FolderDataService
             return false;
         }
         
-        // Manually delete folder nodes associated with this scan
-        // (cascade delete may not work reliably with in-memory database in tests)
+        // Explicitly delete folder nodes to ensure cleanup
         var folderNodes = await context.FolderNodes
             .Where(f => f.ScanResultId == scanId)
             .ToListAsync();

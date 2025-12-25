@@ -341,7 +341,9 @@
         }
         else
         {
-            // No end time and not running (shouldn't happen, but handle it)
+            // No end time and not running - this can happen for Pending scans
+            // or scans that failed to complete properly
+            Logger.LogWarning("Scan {ScanId} has status {Status} but no EndTime", scan.Id, scan.Status);
             return "N/A";
         }
         
